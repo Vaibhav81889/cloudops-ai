@@ -1,6 +1,8 @@
 import logging
 import sys
 import time
+import sqlite3
+import db
 
 import requests
 
@@ -40,9 +42,14 @@ def check_website(url: str) -> dict:
 
 
 def main() -> None:
+    db.init_db()
     urls = sys.argv[1:] or ["https://example.com"]
     for url in urls:
         r = check_website(url)
+        try:
+            db.save_check(r)
+        except sqlite3.Error:
+            logging.exception("Could not save result to database")
         if r["status"] == "UP":
             level = logging.WARNING if r["response_time"] > SLOW_THRESHOLD_SECONDS else logging.INFO
             logging.log(level, "%s UP code=%s time=%ss", r["url"], r["status_code"], r["response_time"])
