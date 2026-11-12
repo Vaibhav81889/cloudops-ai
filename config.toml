@@ -1,5 +1,5 @@
 # CloudOps AI settings
-interval_seconds = 10          # time between check rounds
+interval_seconds = 60          # time between check rounds
 timeout_seconds = 5            # per-request timeout
 slow_threshold_seconds = 2     # warn if slower than this
 failures_before_alert = 2      # consecutive DOWN checks before an incident
