@@ -171,3 +171,14 @@ def get_recent_metrics(limit: int, db_path: str = DB_PATH) -> list:
         ).fetchall()
     finally:
         conn.close()
+
+def get_incidents(open_only: bool = False, limit: int = 50, db_path: str = DB_PATH) -> list:
+    conn = get_connection(db_path)
+    try:
+        if open_only:
+            query = "SELECT * FROM incidents WHERE resolved_at IS NULL ORDER BY id DESC LIMIT ?"
+        else:
+            query = "SELECT * FROM incidents ORDER BY id DESC LIMIT ?"
+        return conn.execute(query, (limit,)).fetchall()
+    finally:
+        conn.close()
