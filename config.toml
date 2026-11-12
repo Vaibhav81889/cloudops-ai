@@ -8,3 +8,9 @@ urls = [
   "https://example.com",
   "https://www.python.org",
 ]
+
+[system]
+cpu_percent = 85
+memory_percent = 85
+disk_percent = 90
+breaches_before_alert = 2

@@ -4,6 +4,7 @@ import sqlite3
 import sys
 import time
 import tomllib
+import system_metrics
 
 import requests
 
@@ -69,6 +70,16 @@ def handle_incident(r: dict, failures_before_alert: int) -> None:
         db.resolve_incident(open_inc["id"])
         alerts.send_alert(f"RECOVERED: {r['url']} is back UP (incident #{open_inc['id']})")
 
+def run_system_check(sys_cfg: dict) -> None:
+    """Collect machine metrics, store them, and check thresholds."""
+    try:
+        m = system_metrics.collect_metrics()
+        db.save_metrics(m)
+        logging.info("SYSTEM cpu=%s%% mem=%s%% disk=%s%%",
+                     m["cpu_percent"], m["memory_percent"], m["disk_percent"])
+        system_metrics.check_thresholds(sys_cfg, sys_cfg.get("breaches_before_alert", 2))
+    except (sqlite3.Error, OSError):
+        logging.exception("System metrics check failed")
 
 def run_cycle(cfg: dict) -> None:
     """Check every configured URL once."""
@@ -85,6 +96,7 @@ def run_cycle(cfg: dict) -> None:
                         "%s UP code=%s time=%ss", r["url"], r["status_code"], r["response_time"])
         else:
             logging.error("%s DOWN reason=%s", r["url"], r["error"])
+    run_system_check(cfg.get("system", {}))
 
 
 def main() -> None:
@@ -100,6 +112,7 @@ def main() -> None:
         sys.exit(1)
 
     db.init_db()
+    db.init_metrics_table()
     if args.once:
         run_cycle(cfg)
         return

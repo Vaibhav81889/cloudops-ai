@@ -1,5 +1,7 @@
 import argparse
 import json
+import alerts
+import db
 from datetime import datetime, timezone
 
 import psutil
@@ -53,6 +55,29 @@ def main() -> None:
     print("Top processes by memory:")
     for p in m["top_processes"]:
         print(f"  pid={p['pid']:<7} {p['memory_percent']:>5}%  {p['name']}")
+
+RESOURCE_CHECKS = {"cpu": "cpu_percent", "memory": "memory_percent", "disk": "disk_percent"}
+
+
+def check_thresholds(limits: dict, consecutive: int) -> None:
+    """Alert when a resource is above its limit for N checks in a row."""
+    recent = db.get_recent_metrics(consecutive)
+    if len(recent) < consecutive:
+        return  # not enough history yet
+    for name, column in RESOURCE_CHECKS.items():
+        limit = limits.get(column)
+        if limit is None:
+            continue
+        key = f"system:{name}"  # reuses the incidents table, keyed per resource
+        latest = recent[0][column]
+        breached = all(row[column] is not None and row[column] >= limit for row in recent)
+        open_inc = db.get_open_incident(key)
+        if breached and open_inc is None:
+            db.open_incident(key, f"{name} at {latest}% (limit {limit}%)")
+            alerts.send_alert(f"RESOURCE ALERT: {name} at {latest}% (limit {limit}%, {consecutive} checks in a row)")
+        elif open_inc is not None and latest < limit:
+            db.resolve_incident(open_inc["id"])
+            alerts.send_alert(f"RESOURCE RECOVERED: {name} back to {latest}% (limit {limit}%)")
 
 
 if __name__ == "__main__":

@@ -128,3 +128,46 @@ def count_consecutive_failures(url: str, limit: int, db_path: str = DB_PATH) -> 
         else:
             break
     return count
+
+def init_metrics_table(db_path: str = DB_PATH) -> None:
+    conn = get_connection(db_path)
+    try:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS metrics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                collected_at TEXT NOT NULL,
+                cpu_percent REAL,
+                memory_percent REAL,
+                disk_percent REAL,
+                load_avg_1m REAL
+            )
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def save_metrics(m: dict, db_path: str = DB_PATH) -> None:
+    conn = get_connection(db_path)
+    try:
+        conn.execute(
+            "INSERT INTO metrics (collected_at, cpu_percent, memory_percent, disk_percent, load_avg_1m) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (m["collected_at"], m["cpu_percent"], m["memory_percent"],
+             m["disk_percent"], m["load_avg_1m"]),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_recent_metrics(limit: int, db_path: str = DB_PATH) -> list:
+    conn = get_connection(db_path)
+    try:
+        return conn.execute(
+            "SELECT * FROM metrics ORDER BY id DESC LIMIT ?", (limit,)
+        ).fetchall()
+    finally:
+        conn.close()
