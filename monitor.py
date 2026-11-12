@@ -3,6 +3,7 @@ import sys
 import time
 import sqlite3
 import db
+import alerts
 
 import requests
 
@@ -15,6 +16,7 @@ logging.basicConfig(
 
 TIMEOUT_SECONDS = 5       # give up after 5s instead of hanging forever
 SLOW_THRESHOLD_SECONDS = 2  # warn if a response takes longer than this
+FAILURES_BEFORE_ALERT = 2  # consecutive DOWN checks required to open an incident
 
 
 def check_website(url: str) -> dict:
@@ -40,6 +42,17 @@ def check_website(url: str) -> dict:
         result["error"] = f"Request error: {exc}"
     return result
 
+def handle_incident(r: dict) -> None:
+    """Open/close incidents based on state changes and alert once per change."""
+    open_inc = db.get_open_incident(r["url"])
+    if r["status"] == "DOWN":
+        failures = db.count_consecutive_failures(r["url"], FAILURES_BEFORE_ALERT)
+        if open_inc is None and failures >= FAILURES_BEFORE_ALERT:
+            db.open_incident(r["url"], r["error"])
+            alerts.send_alert(f"INCIDENT OPENED: {r['url']} is DOWN ({r['error']})")
+    elif open_inc is not None:
+        db.resolve_incident(open_inc["id"])
+        alerts.send_alert(f"RECOVERED: {r['url']} is back UP (incident #{open_inc['id']})")
 
 def main() -> None:
     db.init_db()
@@ -48,8 +61,9 @@ def main() -> None:
         r = check_website(url)
         try:
             db.save_check(r)
+            handle_incident(r)
         except sqlite3.Error:
-            logging.exception("Could not save result to database")
+            logging.exception("Could not save result or update incidents")
         if r["status"] == "UP":
             level = logging.WARNING if r["response_time"] > SLOW_THRESHOLD_SECONDS else logging.INFO
             logging.log(level, "%s UP code=%s time=%ss", r["url"], r["status_code"], r["response_time"])

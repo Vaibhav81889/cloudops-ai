@@ -11,7 +11,7 @@ def get_connection(db_path: str = DB_PATH) -> sqlite3.Connection:
 
 
 def init_db(db_path: str = DB_PATH) -> None:
-    """Create the table if it doesn't exist yet."""
+    """Create the tables if they don't exist yet."""
     conn = get_connection(db_path)
     try:
         conn.execute(
@@ -29,6 +29,17 @@ def init_db(db_path: str = DB_PATH) -> None:
         )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_checks_url_time ON checks (url, checked_at)"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS incidents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                url TEXT NOT NULL,
+                started_at TEXT NOT NULL,
+                resolved_at TEXT,
+                reason TEXT
+            )
+            """
         )
         conn.commit()
     finally:
@@ -64,3 +75,56 @@ def get_recent_checks(limit: int = 10, db_path: str = DB_PATH) -> list:
         ).fetchall()
     finally:
         conn.close()
+
+def get_open_incident(url: str, db_path: str = DB_PATH):
+    """Return the unresolved incident for this URL, or None."""
+    conn = get_connection(db_path)
+    try:
+        return conn.execute(
+            "SELECT * FROM incidents WHERE url = ? AND resolved_at IS NULL", (url,)
+        ).fetchone()
+    finally:
+        conn.close()
+
+
+def open_incident(url: str, reason: str, db_path: str = DB_PATH) -> None:
+    conn = get_connection(db_path)
+    try:
+        conn.execute(
+            "INSERT INTO incidents (url, started_at, reason) VALUES (?, ?, ?)",
+            (url, datetime.now(timezone.utc).isoformat(timespec="seconds"), reason),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def resolve_incident(incident_id: int, db_path: str = DB_PATH) -> None:
+    conn = get_connection(db_path)
+    try:
+        conn.execute(
+            "UPDATE incidents SET resolved_at = ? WHERE id = ?",
+            (datetime.now(timezone.utc).isoformat(timespec="seconds"), incident_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def count_consecutive_failures(url: str, limit: int, db_path: str = DB_PATH) -> int:
+    """Count how many of the most recent checks for this URL failed in a row."""
+    conn = get_connection(db_path)
+    try:
+        rows = conn.execute(
+            "SELECT status FROM checks WHERE url = ? ORDER BY id DESC LIMIT ?",
+            (url, limit),
+        ).fetchall()
+    finally:
+        conn.close()
+    count = 0
+    for row in rows:
+        if row["status"] == "DOWN":
+            count += 1
+        else:
+            break
+    return count
