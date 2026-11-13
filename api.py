@@ -1,8 +1,10 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Response
+from prometheus_client import CONTENT_TYPE_LATEST
 
 import db
+import exporter
 
 
 @asynccontextmanager
@@ -41,3 +43,7 @@ def latest_system() -> dict:
     if not rows:
         raise HTTPException(status_code=404, detail="No system metrics stored yet")
     return dict(rows[0])
+
+@app.get("/metrics")
+def prometheus_metrics():
+    return Response(content=exporter.render_metrics(), media_type=CONTENT_TYPE_LATEST)

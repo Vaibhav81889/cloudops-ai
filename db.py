@@ -182,3 +182,15 @@ def get_incidents(open_only: bool = False, limit: int = 50, db_path: str = DB_PA
         return conn.execute(query, (limit,)).fetchall()
     finally:
         conn.close()
+
+def get_latest_checks(db_path: str = DB_PATH) -> list:
+    """Most recent check for each URL."""
+    conn = get_connection(db_path)
+    try:
+        return conn.execute(
+            "SELECT c.* FROM checks c "
+            "JOIN (SELECT url, MAX(id) AS max_id FROM checks GROUP BY url) m "
+            "ON c.id = m.max_id ORDER BY c.url"
+        ).fetchall()
+    finally:
+        conn.close()

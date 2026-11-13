@@ -43,3 +43,20 @@ def test_open_incidents_filter(client):
 
 def test_system_latest_404_when_empty(client):
     assert client.get("/system/latest").status_code == 404
+
+def test_prometheus_metrics_down_site(client):
+    db.save_check({"url": "https://x.test", "status": "DOWN", "status_code": None,
+                   "response_time": None, "error": "Timeout"})
+    db.open_incident("https://x.test", "Timeout")
+    r = client.get("/metrics")
+    assert r.status_code == 200
+    assert 'cloudops_site_up{url="https://x.test"} 0.0' in r.text
+    assert "cloudops_open_incidents 1.0" in r.text
+
+
+def test_prometheus_metrics_up_site(client):
+    db.save_check({"url": "https://ok.test", "status": "UP", "status_code": 200,
+                   "response_time": 0.25, "error": None})
+    text = client.get("/metrics").text
+    assert 'cloudops_site_up{url="https://ok.test"} 1.0' in text
+    assert 'cloudops_site_response_seconds{url="https://ok.test"} 0.25' in text
