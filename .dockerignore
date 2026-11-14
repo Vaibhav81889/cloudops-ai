@@ -1,0 +1,15 @@
+cd ~/cloudops-ai
+cat > .dockerignore << 'EOF'
+.venv/
+venv/
+.git/
+__pycache__/
+*.pyc
+*.db
+*.log
+.pytest_cache/
+tests/
+grafana/
+prometheus/
+*.tar.gz
+EOF
