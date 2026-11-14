@@ -207,3 +207,25 @@ def get_response_times(url: str, limit: int = 500, db_path: str = DB_PATH) -> li
     finally:
         conn.close()
     return list(reversed(rows))
+
+def get_incident(incident_id=None, db_path: str = DB_PATH):
+    """One incident by id, or the newest one if no id is given."""
+    conn = get_connection(db_path)
+    try:
+        if incident_id is None:
+            return conn.execute("SELECT * FROM incidents ORDER BY id DESC LIMIT 1").fetchone()
+        return conn.execute("SELECT * FROM incidents WHERE id = ?", (incident_id,)).fetchone()
+    finally:
+        conn.close()
+
+
+def get_checks_between(url: str, start: str, end: str, db_path: str = DB_PATH) -> list:
+    """Checks for one URL between two ISO timestamps (inclusive), oldest first."""
+    conn = get_connection(db_path)
+    try:
+        return conn.execute(
+            "SELECT * FROM checks WHERE url = ? AND checked_at >= ? AND checked_at <= ? ORDER BY id",
+            (url, start, end),
+        ).fetchall()
+    finally:
+        conn.close()
