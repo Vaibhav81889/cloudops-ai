@@ -194,3 +194,16 @@ def get_latest_checks(db_path: str = DB_PATH) -> list:
         ).fetchall()
     finally:
         conn.close()
+
+def get_response_times(url: str, limit: int = 500, db_path: str = DB_PATH) -> list:
+    """Oldest-first (checked_at, response_time) rows for one URL."""
+    conn = get_connection(db_path)
+    try:
+        rows = conn.execute(
+            "SELECT checked_at, response_time FROM checks "
+            "WHERE url = ? AND response_time IS NOT NULL ORDER BY id DESC LIMIT ?",
+            (url, limit),
+        ).fetchall()
+    finally:
+        conn.close()
+    return list(reversed(rows))
