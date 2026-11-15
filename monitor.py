@@ -43,7 +43,7 @@ def check_website(url: str, timeout: float) -> dict:
         response = requests.get(url, timeout=timeout)
         result["response_time"] = round(time.perf_counter() - start, 3)
         result["status_code"] = response.status_code
-        if response.status_code < 400:
+        if response.status_code < 200:
             result["status"] = "UP"
         else:
             result["error"] = f"HTTP {response.status_code}"
