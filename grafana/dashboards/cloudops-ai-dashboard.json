@@ -1,0 +1,66 @@
+{
+  "uid": "cloudops-ai",
+  "title": "CloudOps AI",
+  "tags": ["cloudops"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {"from": "now-30m", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Site status",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "targets": [
+        {"refId": "A", "expr": "cloudops_site_up", "legendFormat": "{{url}}",
+         "datasource": {"type": "prometheus", "uid": "prometheus"}}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {"mode": "absolute",
+                         "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]},
+          "mappings": [
+            {"type": "value", "options": {
+              "1": {"text": "UP", "color": "green", "index": 0},
+              "0": {"text": "DOWN", "color": "red", "index": 1}}}
+          ]
+        },
+        "overrides": []
+      },
+      "options": {"colorMode": "value", "graphMode": "area", "textMode": "value_and_name",
+                  "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Response time",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "targets": [
+        {"refId": "A", "expr": "cloudops_site_response_seconds", "legendFormat": "{{url}}",
+         "datasource": {"type": "prometheus", "uid": "prometheus"}}
+      ],
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []}
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "System usage",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8},
+      "targets": [
+        {"refId": "A", "expr": "cloudops_system_cpu_percent", "legendFormat": "CPU",
+         "datasource": {"type": "prometheus", "uid": "prometheus"}},
+        {"refId": "B", "expr": "cloudops_system_memory_percent", "legendFormat": "Memory",
+         "datasource": {"type": "prometheus", "uid": "prometheus"}},
+        {"refId": "C", "expr": "cloudops_system_disk_percent", "legendFormat": "Disk",
+         "datasource": {"type": "prometheus", "uid": "prometheus"}}
+      ],
+      "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100}, "overrides": []}
+    }
+  ]
+}
