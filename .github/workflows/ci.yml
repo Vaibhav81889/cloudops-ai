@@ -30,6 +30,8 @@ jobs:
         run: pytest -v
 
   docker-build:
+    # On pull requests: prove the image builds, publish nothing
+    if: github.event_name == 'pull_request'
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -38,3 +40,29 @@ jobs:
 
       - name: Build the Docker image
         run: docker build -t cloudops-ai:ci .
+
+  publish:
+    # On main only, after the tests pass: publish the image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build and push the image to GitHub Container Registry
+        env:
+          OWNER: ${{ github.repository_owner }}
+          ACTOR: ${{ github.actor }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.sha }}
+        run: |
+          IMAGE="ghcr.io/${OWNER,,}/cloudops-ai"
+          echo "$TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+          docker build -t "$IMAGE:sha-${SHA::7}" -t "$IMAGE:latest" .
+          docker push "$IMAGE:sha-${SHA::7}"
+          docker push "$IMAGE:latest"
+          echo "Published $IMAGE:sha-${SHA::7}"
