@@ -1,0 +1,51 @@
+name: cloudops-ai
+
+services:
+  api:
+    image: ghcr.io/vaibhav81889/cloudops-ai:${CLOUDOPS_TAG:?set CLOUDOPS_TAG in .env}
+    command: ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - cloudops-data:/data
+    restart: unless-stopped
+
+  monitor:
+    image: ghcr.io/vaibhav81889/cloudops-ai:${CLOUDOPS_TAG:?set CLOUDOPS_TAG in .env}
+    command: ["python", "/app/monitor.py", "--config", "/app/config.toml"]
+    volumes:
+      - cloudops-data:/data
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.12.0
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./prometheus/prometheus.compose.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:13.3.1
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  cloudops-data:
+  prometheus-data:
+  grafana-data:
