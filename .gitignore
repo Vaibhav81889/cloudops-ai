@@ -7,3 +7,10 @@ __pycache__/
 *.tar.gz
 *.tar.gz
 .env
+
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+crash.log
