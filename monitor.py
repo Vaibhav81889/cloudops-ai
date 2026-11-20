@@ -26,6 +26,8 @@ def load_config(path: str) -> dict:
     if not isinstance(urls, list) or not urls:
         raise ValueError("config 'urls' must be a non-empty list")
     cfg.setdefault("interval_seconds", 60)
+    if cfg["failures_before_alert"] < 1:
+        raise ValueError("failures_before_alert must be at least 1")
     cfg.setdefault("timeout_seconds", 5)
     cfg.setdefault("slow_threshold_seconds", 2)
     cfg.setdefault("failures_before_alert", 2)
@@ -58,13 +60,13 @@ def check_website(url: str, timeout: float) -> dict:
     return result
 
 
-def handle_incident(r: dict, failures_before_alert: int) -> None:
+def handle_incident(r: dict, failures_before_alert: int, max_gap_seconds=None) -> None:
     """Open/close incidents based on state changes and alert once per change."""
     open_inc = db.get_open_incident(r["url"])
     if r["status"] == "DOWN":
-        failures = db.count_consecutive_failures(r["url"], failures_before_alert)
-        if open_inc is None and failures >= failures_before_alert:
-            db.open_incident(r["url"], r["error"])
+        streak = db.get_failure_streak(r["url"], failures_before_alert, max_gap_seconds)
+        if open_inc is None and len(streak) >= failures_before_alert:
+            db.open_incident(r["url"], r["error"], started_at=streak[-1])
             alerts.send_alert(f"INCIDENT OPENED: {r['url']} is DOWN ({r['error']})")
     elif open_inc is not None:
         db.resolve_incident(open_inc["id"])
@@ -87,7 +89,7 @@ def run_cycle(cfg: dict) -> None:
         r = check_website(url, cfg["timeout_seconds"])
         try:
             db.save_check(r)
-            handle_incident(r, cfg["failures_before_alert"])
+            handle_incident(r, cfg["failures_before_alert"], cfg["interval_seconds"] * 3)
         except sqlite3.Error:
             logging.exception("Could not save result or update incidents")
         if r["status"] == "UP":

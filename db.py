@@ -87,12 +87,12 @@ def get_open_incident(url: str, db_path: str = DB_PATH):
         conn.close()
 
 
-def open_incident(url: str, reason: str, db_path: str = DB_PATH) -> None:
+def open_incident(url: str, reason: str, db_path: str = DB_PATH, started_at=None) -> None:
     conn = get_connection(db_path)
     try:
         conn.execute(
             "INSERT INTO incidents (url, started_at, reason) VALUES (?, ?, ?)",
-            (url, datetime.now(timezone.utc).isoformat(timespec="seconds"), reason),
+            (url, started_at or datetime.now(timezone.utc).isoformat(timespec="seconds"), reason),
         )
         conn.commit()
     finally:
@@ -229,3 +229,27 @@ def get_checks_between(url: str, start: str, end: str, db_path: str = DB_PATH) -
         ).fetchall()
     finally:
         conn.close()
+
+def get_failure_streak(url: str, limit: int, max_gap_seconds=None, db_path: str = DB_PATH) -> list:
+    """Timestamps (newest first) of the latest consecutive DOWN checks, at most `limit`.
+    The streak also stops where two neighbouring checks are further apart than
+    max_gap_seconds (for example, because the monitor was switched off)."""
+    conn = get_connection(db_path)
+    try:
+        rows = conn.execute(
+            "SELECT status, checked_at FROM checks WHERE url = ? ORDER BY id DESC LIMIT ?",
+            (url, limit),
+        ).fetchall()
+    finally:
+        conn.close()
+    streak = []
+    for row in rows:
+        if row["status"] != "DOWN":
+            break
+        if streak and max_gap_seconds is not None:
+            newer = datetime.fromisoformat(streak[-1])
+            older = datetime.fromisoformat(row["checked_at"])
+            if (newer - older).total_seconds() > max_gap_seconds:
+                break
+        streak.append(row["checked_at"])
+    return streak
